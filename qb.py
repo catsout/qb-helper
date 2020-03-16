@@ -64,7 +64,7 @@ def getTorrentPeers(root_url, session, tro_hash, rid):
     rsp = session.get(url, params=content, headers=headers_tmp)
     return json.loads(str(rsp.content, 'utf-8'))
 
-def readconf(conf_path="bx.conf"):
+def readconf(conf_path):
     with open(conf_path,mode='r') as conf_file:
         for line in conf_file:
             if line[0] == '#':
@@ -86,9 +86,9 @@ def readconf(conf_path="bx.conf"):
                     conf[key] = value
     
 
-def reloadIpFilter(root_url, session, bannedIps):
+def reloadIpFilter(root_url, session):
     url = root_url + '/api/v2/app/setPreferences'
-    reload = {'ip_filter_enabled': True, 'banned_IPs': bannedIps}
+    reload = {'ip_filter_enabled': True}
     content = {'json': json.dumps(reload, ensure_ascii=False)}
     session.post(url, content, headers=headers)
 
@@ -106,32 +106,14 @@ def isNeedBlockClient(peer):
 
     return False
 
-def loadTrackerByGithubAndSetting(url, cookie):
-    github_headers = {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,'
-                  'application/signed-exchange;v=b3 ',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                      'Chrome/78.0.3904.108 Safari/537.36 ',
-        'Accept-Encoding': 'gzip, deflate, br',
-    }
-    # 10秒超时设置
-    rsp = requests.get(github_user_content_url, headers=github_headers, timeout=10)
-    trackers = str(rsp.content, 'utf-8')
-    # print(trackers)
-
-    reload = {'add_trackers_enabled': True, 'add_trackers': trackers}
-    content = {'json': json.dumps(reload, ensure_ascii=False)}
-
-    requests.post(url, content, headers=headers, cookies=cookie)
-
 def login(root_url, session, username, password):
     url = root_url + '/api/v2/auth/login'
     response = session.post(url, {"username":username, "password":password}, headers=headers)
     return response.text
 
-def blocking():
+def blocking(conf_path):
     #read conf file to confdict
-    readconf()
+    readconf(conf_path)
     #the rid for the session
     rid = newrid()
     #the funcs are writen like root_url+api_url
@@ -150,7 +132,7 @@ def blocking():
             match = re.match("([^\-]+?)-",line)
             if match is not None:
                 blocked_ips[match.group(1).strip()] = None
-    print("There have been "+str(len(blocked_ips))+"ips filtered")
+    print("There have been "+str(len(blocked_ips))+" ips filtered")
     newblock_ips = {} 
     print("The block ip set:" + str(conf["block"]))
     #scaning
@@ -180,13 +162,24 @@ def blocking():
             print("refresh added list")
             with open(conf['ipdat_path'],mode='a+') as file_ips:
                 file_ips.write(ip_str)
-            reloadIpFilter(root_url, session, "")
+            reloadIpFilter(root_url, session)
             newblock_ips.clear()
 
         time.sleep(10)
     
     
 if __name__ == "__main__":
-    github_user_content_url = 'https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_all.txt'
-    blocking()
+    import argparse
+    import os
+    parser = argparse.ArgumentParser(description='ban specific clients for qbitorrent')
+    parser.add_argument('-c','--conf', help='conf file path')
+    args = parser.parse_args()
+    conf_path = vars(args)['conf']
+    if os.access(conf_path, os.R_OK):
+        blocking(conf_path)
+    elif os.access('bx.conf',os.R_OK):
+        blocking('bx.conf')
+    else:
+        print("not found conf file")
+
 
