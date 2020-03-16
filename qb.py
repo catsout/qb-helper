@@ -174,8 +174,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='ban specific clients for qbitorrent')
     parser.add_argument('-c','--conf', help='conf file path')
     args = parser.parse_args()
-    conf_path = vars(args)['conf']
-    if os.access(conf_path, os.R_OK):
+    conf_path = vars(args).get('conf')
+    if (conf_path is not None) and os.access(conf_path, os.R_OK):
         blocking(conf_path)
     elif os.access('bx.conf',os.R_OK):
         blocking('bx.conf')
