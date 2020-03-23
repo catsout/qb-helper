@@ -5,7 +5,7 @@ import time
 import random
 import math
 import string
-
+from datetime import date
 from requests import RequestException
 
 headers = {
@@ -21,7 +21,8 @@ conf = {
     "username":"admin",
     "password":"",
     "ipdat_path":"",
-    "block":[] #like [{"str":"","type":""}]
+    "block":[], #like [{"str":"","type":""}]
+    "refresh_internal":"0"
 }
 
 
@@ -88,10 +89,13 @@ def readconf(conf_path):
 
 def reloadIpFilter(root_url, session):
     url = root_url + '/api/v2/app/setPreferences'
+    reload = {'ip_filter_enabled': False}
+    content = {'json': json.dumps(reload, ensure_ascii=False)}
+    session.post(url, content, headers=headers)
+    time.sleep(2)
     reload = {'ip_filter_enabled': True}
     content = {'json': json.dumps(reload, ensure_ascii=False)}
     session.post(url, content, headers=headers)
-
 
 def isNeedBlockClient(peer):
     client = peer.get('client')
@@ -111,6 +115,7 @@ def login(root_url, session, username, password):
     response = session.post(url, {"username":username, "password":password}, headers=headers)
     return response.text
 
+
 def blocking(conf_path):
     #read conf file to confdict
     readconf(conf_path)
@@ -118,6 +123,7 @@ def blocking(conf_path):
     rid = newrid()
     #the funcs are writen like root_url+api_url
     root_url = "http://"+conf["ip"]+":"+conf["port"]
+    lasttime = date.today()
 
     session = requests.session()
     
@@ -148,7 +154,7 @@ def blocking(conf_path):
             if "peers" not in peersinfo:
                 continue
             for v in peersinfo["peers"].values():
-                if (v['ip'] not in blocked_ips) and isNeedBlockClient(v):
+                if v.get('ip') and (v['ip'] not in blocked_ips) and isNeedBlockClient(v):
                     print("find "+ v["client"] + " at " + v["ip"] + ". added")
                     newblock_ips[v['ip']] = None
             time.sleep(1)
@@ -164,6 +170,15 @@ def blocking(conf_path):
                 file_ips.write(ip_str)
             reloadIpFilter(root_url, session)
             newblock_ips.clear()
+
+        nowtime = date.today()
+        re_internal = int(conf["refresh_internal"])
+        if re_internal == 0 and (nowtime - lasttime).days == re_internal:
+            with open(conf['ipdat_path'],mode='w+') as file_ips:
+                file_ips.write("")
+            blocked_ips = newblock_ips = {}
+            lasttime = nowtime
+            print("blocked list cleaned")
 
         time.sleep(10)
     
