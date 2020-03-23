@@ -173,7 +173,7 @@ def blocking(conf_path):
 
         nowtime = date.today()
         re_internal = int(conf["refresh_internal"])
-        if re_internal == 0 and (nowtime - lasttime).days == re_internal:
+        if re_internal > 0 and (nowtime - lasttime).days > re_internal:
             with open(conf['ipdat_path'],mode='w+') as file_ips:
                 file_ips.write("")
             blocked_ips = newblock_ips = {}
