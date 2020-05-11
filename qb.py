@@ -133,11 +133,12 @@ def blocking(conf_path):
 
     #set block ip
     blocked_ips = {} #like {"ip":None}
-    with open(conf["ipdat_path"],mode='r') as file_ips:
-        for line in file_ips:
-            match = re.match("([^\-]+?)-",line)
-            if match is not None:
-                blocked_ips[match.group(1).strip()] = None
+    if os.access(conf["ipdat_path"],os.F_OK):
+        with open(conf["ipdat_path"],mode='r') as file_ips:
+            for line in file_ips:
+                match = re.match("([^\-]+?)-",line)
+                if match is not None:
+                    blocked_ips[match.group(1).strip()] = None
     print("There have been "+str(len(blocked_ips))+" ips filtered")
     newblock_ips = {} 
     print("The block ip set:" + str(conf["block"]))
@@ -190,9 +191,9 @@ if __name__ == "__main__":
     parser.add_argument('-c','--conf', help='conf file path')
     args = parser.parse_args()
     conf_path = vars(args).get('conf')
-    if (conf_path is not None) and os.access(conf_path, os.R_OK):
+    if (conf_path is not None) and os.access(conf_path, os.F_OK):
         blocking(conf_path)
-    elif os.access('bx.conf',os.R_OK):
+    elif os.access('bx.conf',os.F_OK):
         blocking('bx.conf')
     else:
         print("not found conf file")
