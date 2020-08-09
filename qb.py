@@ -24,7 +24,7 @@ conf = {
     "block":[], #like [{"str":"","type":""}]
     "refresh_internal":"0"
 }
-
+rid = None
 
 def newrid():
     return int(random.random()*1000)
@@ -115,13 +115,28 @@ def login(root_url, session, username, password):
     response = session.post(url, {"username":username, "password":password}, headers=headers)
     return response.text
 
-
-def blocking(conf_path):
+def start(conf_path):
     #read conf file to confdict
     readconf(conf_path)
     #the rid for the session
     rid = newrid()
-    #the funcs are writen like root_url+api_url
+    while(True):
+        try:
+            blocking()
+        except requests.exceptions.RequestException as err:
+            print ("OOps: Something Else",err)
+        except requests.exceptions.HTTPError as errh:
+            print ("Http Error:",errh)
+        except requests.exceptions.ConnectionError as errc:
+            print ("Error Connecting:",errc)
+        except requests.exceptions.Timeout as errt:
+            print ("Timeout Error:",errt)
+        print("sleep 1 min")
+        time.sleep(60)
+     
+
+def blocking():
+   #the funcs are writen like root_url+api_url
     root_url = "http://"+conf["ip"]+":"+conf["port"]
     lasttime = date.today()
 
@@ -139,9 +154,9 @@ def blocking(conf_path):
                 match = re.match("([^\-]+?)-",line)
                 if match is not None:
                     blocked_ips[match.group(1).strip()] = None
-    print("There have been "+str(len(blocked_ips))+" ips filtered")
+    print("There already have been "+str(len(blocked_ips))+" ips filtered")
     newblock_ips = {} 
-    print("The block ip set:" + str(conf["block"]))
+    print("The block clients are set to:" + str(conf["block"]))
     #scaning
     print("begin scan torrents")
     while True:
@@ -156,7 +171,7 @@ def blocking(conf_path):
                 continue
             for v in peersinfo["peers"].values():
                 if v.get('ip') and (v['ip'] not in blocked_ips) and isNeedBlockClient(v):
-                    print("find "+ v["client"] + " at " + v["ip"] + ". added")
+                    print("find "+ v["client"] + " at " + v["ip"] + ", add to cache list")
                     newblock_ips[v['ip']] = None
             time.sleep(1)
         
@@ -166,7 +181,7 @@ def blocking(conf_path):
             for newip in newblock_ips:
                 ip_str = ip_str + newip + '-' + newip + ' , 127 , banxunlei\n'
                 blocked_ips[newip] = None
-            print("refresh added list")
+            print("apply and clean cache list")
             with open(conf['ipdat_path'],mode='a+') as file_ips:
                 file_ips.write(ip_str)
             reloadIpFilter(root_url, session)
@@ -192,9 +207,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     conf_path = vars(args).get('conf')
     if (conf_path is not None) and os.access(conf_path, os.F_OK):
-        blocking(conf_path)
+        start(conf_path)
     elif os.access('bx.conf',os.F_OK):
-        blocking('bx.conf')
+        start('bx.conf')
     else:
         print("not found conf file")
 
