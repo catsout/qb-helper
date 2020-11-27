@@ -9,13 +9,13 @@ from datetime import date
 from requests import RequestException
 
 conf = {
-    "ip":"127.0.0.1",
-    "port":8081,
-    "username":"admin",
-    "password":"",
-    "ipdat_path":"",
-    "block":[], #like [{"str":"","type":""}]
-    "refresh_internal":"0"
+    'ip':'127.0.0.1',
+    'port':8081,
+    'username':'admin',
+    'password':'',
+    'ipdat_path':'',
+    'block':[], #like [{'str':'','type':''}]
+    'refresh_internal':'0'
 }
 
 ########## qbitorrent api ##########
@@ -51,10 +51,10 @@ class QbAPI:
         url = self.root_url + '/api/v2/torrents/info'
         content = {'rid': self.rid}
         if tor_filter is not None:
-            content["filter"] = tor_filter
+            content['filter'] = tor_filter
         if tor_filter is not None:
-            content["sort"] = sort
-            content["reverse"] = reverse
+            content['sort'] = sort
+            content['reverse'] = reverse
         for param in otherparams:
             content[param] = otherparams[param]
         rsp = self.session.get(url, params=content, headers=self.header_json)
@@ -80,15 +80,35 @@ class QbAPI:
    
     def login(self, username, password):
         url = self.root_url + '/api/v2/auth/login'
-        response = self.session.post(url, {"username":username, "password":password})
+        response = self.session.post(url, {'username':username, 'password':password})
         return response.text
+
+
+def loadIpdatFromFile(path, ipdat):
+    #{ip}-{ip} , 127 , label
+    if os.access(path, os.F_OK):
+       with open(path, mode='r') as file_ips:
+           for line in file_ips:
+               match = re.match('([^\-]+?)-',line)
+               if match is not None:
+                   ipdat.add(match.group(1).strip())
+
+def writeIpdatToFile(path, ipdat, append=True):
+    mode = 'a+' if append else 'w+'
+    with open(path, mode=mode) as file_ips:
+        new_ips = ''
+        for ip in ipdat:
+            new_ips = new_ips + ip + '-' + ip + ' , 127 , banned\n'
+        file_ips.write(new_ips)
+
+
 
 def isNeedBlockClient(self, peer):
     client = peer.get('client')
     if client is None:
         return False
 
-    for deFilter in conf["block"]:
+    for deFilter in conf['block']:
         if int(deFilter['type']) == 1 and client.find(deFilter['str']) > -1:
             return True
         elif int(deFilter['type']) == 2 and client.startswith(deFilter['str']):
@@ -102,19 +122,19 @@ def readconf(conf_path):
         for line in conf_file:
             if line[0] == '#':
                 continue
-            match = re.match("([\w ]+?)=",line)
+            match = re.match('([\w ]+?)=',line)
             if match is None:
                 continue
             key = match.group(1).strip()
             if key not in conf:
                 continue
-            value = re.search("=(\S+)",line)
+            value = re.search('=(\S+)',line)
             if value is not None:
                 value = value.group(1).strip()
-                if key == "block":
-                    value = re.match("(\S+?),(\S+)",value)
+                if key == 'block':
+                    value = re.match('(\S+?),(\S+)',value)
                     if value is not None:
-                        conf[key].append({"str":value.group(1),"type":value.group(2)})
+                        conf[key].append({'str':value.group(1),'type':value.group(2)})
                 else:
                     conf[key] = value
     
@@ -129,85 +149,71 @@ def start(conf_path):
         try:
             blocking()
         except requests.exceptions.RequestException as err:
-            print ("OOps: Something Else",err)
+            print ('OOps: Something Else',err)
         except requests.exceptions.HTTPError as errh:
-            print ("Http Error:",errh)
+            print ('Http Error:',errh)
         except requests.exceptions.ConnectionError as errc:
-            print ("Error Connecting:",errc)
+            print ('Error Connecting:',errc)
         except requests.exceptions.Timeout as errt:
-            print ("Timeout Error:",errt)
-        print("sleep 1 min")
+            print ('Timeout Error:',errt)
+        print('sleep 1 min')
         time.sleep(60)
      
 
 def blocking():
-   #the funcs are writen like root_url+api_url
-    root_url = "http://"+conf["ip"]+":"+conf["port"]
+    root_url = 'http://'+conf['ip']+':'+conf['port']
     lasttime = date.today()
-
     session = requests.session()
     qb_api = QbAPI(root_url, session);
 
     #login
-    if qb_api.login(conf["username"], conf["password"]) != 'Ok.':
+    if qb_api.login(conf['username'], conf['password']) != 'Ok.':
         exit(0)
 
     #set block ip
-    blocked_ips = {} #like {"ip":None}
-    if os.access(conf["ipdat_path"],os.F_OK):
-        with open(conf["ipdat_path"],mode='r') as file_ips:
-            for line in file_ips:
-                match = re.match("([^\-]+?)-",line)
-                if match is not None:
-                    blocked_ips[match.group(1).strip()] = None
-
-
-    print("There already have been "+str(len(blocked_ips))+" ips filtered")
-    newblock_ips = {} 
-    print("The block clients are set to:" + str(conf["block"]))
+    blocked_ips = set()
+    loadIpdatFromFile(conf['ipdat_path'], blocked_ips)
+    print('There already have been '+str(len(blocked_ips))+' ips filtered')
+    newblock_ips = set()
+    print('The block clients are set to:' + str(conf['block']))
     #scaning
-    print("begin scan torrents")
+    print('begin scan torrents')
     while True:
         #get a torrentlist that sorted by upspeed from large to small for finding xunlei
-        tor_list = qb_api.getTorrentList(tor_filter="active", sort="upspeed")
-        #print("there is " + str(len(tor_list)) + " torrents active now")
+        tor_list = qb_api.getTorrentList(tor_filter='active', sort='upspeed')
+        #print('there is ' + str(len(tor_list)) + ' torrents active now')
 
         for tor in tor_list:
-            #the peersinfo is like { "some":some, "peers":{"ip:port":{"client":wanted,"upspeed":value}}}
-            peersinfo = qb_api.getTorrentPeers(tor["hash"])
-            if "peers" not in peersinfo:
+            #the peersinfo is like { 'some':some, 'peers':{'ip:port':{'client':wanted,'upspeed':value}}}
+            peersinfo = qb_api.getTorrentPeers(tor['hash'])
+            if 'peers' not in peersinfo:
                 continue
-            for v in peersinfo["peers"].values():
+            for v in peersinfo['peers'].values():
                 if v.get('ip') and (v['ip'] not in blocked_ips) and isNeedBlockClient(v):
-                    print("find "+ v["client"] + " at " + v["ip"] + ", add to cache list")
-                    newblock_ips[v['ip']] = None
+                    print('find '+ v['client'] + ' at ' + v['ip'] + ', add to cache list')
+                    newblock_ips.add(v['ip'])
             time.sleep(1)
         
         #refresh new block in file and apply
         if len(newblock_ips) > 0:
-            ip_str = ""
-            for newip in newblock_ips:
-                ip_str = ip_str + newip + '-' + newip + ' , 127 , banxunlei\n'
-                blocked_ips[newip] = None
-            print("apply and clean cache list")
-            with open(conf['ipdat_path'],mode='a+') as file_ips:
-                file_ips.write(ip_str)
-            reloadIpFilter(root_url, session)
+            blocked_ips.update(newblock_ips)
+            writeIpdatToFile(conf['ipdat_path'], newblock_ips)
+            print('apply and clean cache list')
             newblock_ips.clear()
 
         nowtime = date.today()
-        re_internal = int(conf["refresh_internal"])
+        re_internal = int(conf['refresh_internal'])
         if re_internal > 0 and (nowtime - lasttime).days > re_internal:
             with open(conf['ipdat_path'],mode='w+') as file_ips:
-                file_ips.write("")
+                file_ips.write('')
             blocked_ips = newblock_ips = {}
             lasttime = nowtime
-            print("blocked list cleaned")
+            print('blocked list cleaned')
 
         time.sleep(10)
     
     
-if __name__ == "__main__":
+if __name__ == '__main__':
     import argparse
     import os
     parser = argparse.ArgumentParser(description='ban specific clients for qbitorrent')
@@ -219,6 +225,6 @@ if __name__ == "__main__":
     elif os.access('bx.conf',os.F_OK):
         start('bx.conf')
     else:
-        print("not found conf file")
+        print('not found conf file')
 
 
