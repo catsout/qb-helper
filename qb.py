@@ -52,9 +52,9 @@ class QbAPI:
         content = {'rid': self.rid}
         if tor_filter is not None:
             content['filter'] = tor_filter
-        if tor_filter is not None:
+        if sort is not None:
             content['sort'] = sort
-            content['reverse'] = reverse
+        content['reverse'] = reverse
         for param in otherparams:
             content[param] = otherparams[param]
         rsp = self.session.get(url, params=content, headers=self.header_json)
