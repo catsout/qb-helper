@@ -28,7 +28,7 @@ class QbAPI:
         headers = {
             'Accept': 'text/javascript, text/html, application/xml, text/xml, */*',
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.70 Safari/537.36'
+            'User-Agent': 'curl/7.72.0'
         }
         self.rid = self.newrid()
         self.root_url = root_url
