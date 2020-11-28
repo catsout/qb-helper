@@ -83,23 +83,35 @@ class QbAPI:
         response = self.session.post(url, {'username':username, 'password':password})
         return response.text
 
+class Ipdat:
+    # none for not found
+    @staticmethod
+    def matchBannedip(line):
+        units = line.split(',') 
+        if len(units) > 2 and units[2].strip() == 'banned':
+            ip = units[0].split('-')
+            if len(ip) > 0:
+                return ip[0].strip()
+        return None
+    
+    @staticmethod
+    def loadIpdatFromFile(path, ipdat):
+        #{ip}-{ip} , 127 , label
+        if os.access(path, os.F_OK):
+           with open(path, mode='r') as file_ips:
+               for line in file_ips:
+                   match = Ipdat.matchBannedip(line)
+                   if match is not None:
+                       ipdat.add(match)
 
-def loadIpdatFromFile(path, ipdat):
-    #{ip}-{ip} , 127 , label
-    if os.access(path, os.F_OK):
-       with open(path, mode='r') as file_ips:
-           for line in file_ips:
-               match = re.match('([^\-]+?)-',line)
-               if match is not None:
-                   ipdat.add(match.group(1).strip())
-
-def writeIpdatToFile(path, ipdat, append=True):
-    mode = 'a+' if append else 'w+'
-    with open(path, mode=mode) as file_ips:
-        new_ips = ''
-        for ip in ipdat:
-            new_ips = new_ips + ip + '-' + ip + ' , 127 , banned\n'
-        file_ips.write(new_ips)
+    @staticmethod
+    def writeIpdatToFile(path, ipdat, append=True):
+        mode = 'a+' if append else 'w+'
+        with open(path, mode=mode) as file_ips:
+            new_ips = ''
+            for ip in ipdat:
+                new_ips = new_ips + ip + '-' + ip + ' , 127 , banned\n'
+            file_ips.write(new_ips)
 
 
 
@@ -171,17 +183,16 @@ def blocking():
         exit(0)
 
     #set block ip
+
     blocked_ips = set()
-    loadIpdatFromFile(conf['ipdat_path'], blocked_ips)
+    Ipdat.loadIpdatFromFile(conf['ipdat_path'], blocked_ips)
     print('There already have been '+str(len(blocked_ips))+' ips filtered')
     newblock_ips = set()
     print('The block clients are set to:' + str(conf['block']))
     #scaning
     print('begin scan torrents')
     while True:
-        #get a torrentlist that sorted by upspeed from large to small for finding xunlei
         tor_list = qb_api.getTorrentList(tor_filter='active', sort='upspeed')
-        #print('there is ' + str(len(tor_list)) + ' torrents active now')
 
         for tor in tor_list:
             #the peersinfo is like { 'some':some, 'peers':{'ip:port':{'client':wanted,'upspeed':value}}}
@@ -197,10 +208,10 @@ def blocking():
         #refresh new block in file and apply
         if len(newblock_ips) > 0:
             blocked_ips.update(newblock_ips)
-            writeIpdatToFile(conf['ipdat_path'], newblock_ips)
+            Ipdat.writeIpdatToFile(conf['ipdat_path'], newblock_ips)
             print('apply and clean cache list')
             newblock_ips.clear()
-
+        
         nowtime = date.today()
         re_internal = int(conf['refresh_internal'])
         if re_internal > 0 and (nowtime - lasttime).days > re_internal:
