@@ -5,18 +5,20 @@ import time
 import random
 import math
 import string
+import sys
 from datetime import date
 from requests import RequestException
-
+'''
 conf = {
-    'ip':'127.0.0.1',
+    'address':'127.0.0.1',
     'port':8081,
     'username':'admin',
     'password':'',
     'ipdat_path':'',
     'block':[], #like [{'str':'','type':''}]
-    'refresh_internal':'0'
+    'refresh_day':'0'
 }
+'''
 
 ########## qbitorrent api ##########
 class QbAPI:
@@ -127,53 +129,10 @@ def isNeedBlockClient(self, peer):
             return True
 
     return False
-
-
-def readconf(conf_path):
-    with open(conf_path,mode='r') as conf_file:
-        for line in conf_file:
-            if line[0] == '#':
-                continue
-            match = re.match('([\w ]+?)=',line)
-            if match is None:
-                continue
-            key = match.group(1).strip()
-            if key not in conf:
-                continue
-            value = re.search('=(\S+)',line)
-            if value is not None:
-                value = value.group(1).strip()
-                if key == 'block':
-                    value = re.match('(\S+?),(\S+)',value)
-                    if value is not None:
-                        conf[key].append({'str':value.group(1),'type':value.group(2)})
-                else:
-                    conf[key] = value
     
- 
 
-
-def start(conf_path):
-    #read conf file to confdict
-    readconf(conf_path)
-    
-    while(True):
-        try:
-            blocking()
-        except requests.exceptions.RequestException as err:
-            print ('OOps: Something Else',err)
-        except requests.exceptions.HTTPError as errh:
-            print ('Http Error:',errh)
-        except requests.exceptions.ConnectionError as errc:
-            print ('Error Connecting:',errc)
-        except requests.exceptions.Timeout as errt:
-            print ('Timeout Error:',errt)
-        print('sleep 1 min')
-        time.sleep(60)
-     
-
-def blocking():
-    root_url = 'http://'+conf['ip']+':'+conf['port']
+def blocking(conf):
+    root_url = 'http://'+conf['address']+':'+conf['port']
     lasttime = date.today()
     session = requests.session()
     qb_api = QbAPI(root_url, session);
@@ -213,7 +172,7 @@ def blocking():
             newblock_ips.clear()
         
         nowtime = date.today()
-        re_internal = int(conf['refresh_internal'])
+        re_internal = int(conf['refresh_day'])
         if re_internal > 0 and (nowtime - lasttime).days > re_internal:
             with open(conf['ipdat_path'],mode='w+') as file_ips:
                 file_ips.write('')
@@ -222,20 +181,64 @@ def blocking():
             print('blocked list cleaned')
 
         time.sleep(10)
+
+def loadConfFromFile(conf_path):
+    valid_key = {'address','port','username','password','ipdat_path','block','refresh_day'}
+    conf = {'block':[]}
+    with open(conf_path,mode='r') as conf_file:
+        for line in conf_file:
+            if line[0] == '#':
+                continue
+            match = re.match('([\w ]+?)=',line)
+            if match is None:
+                continue
+            key = match.group(1).strip()
+            if key not in valid_key:
+                print('parser conf file error for: ', key, file=sys.stderr)
+            value = re.search('=(\S+)',line)
+            if value is not None:
+                value = value.group(1).strip()
+                if key == 'block':
+                    value = re.match('(\S+?),(\S+)',value)
+                    if value is not None:
+                        conf[key].append({'str':value.group(1),'type':value.group(2)})
+                else:
+                    conf[key] = value
+    return conf
+
     
-    
+def start(conf):
+    while(True):
+        try:
+            blocking(conf)
+        except requests.exceptions.RequestException as err:
+            print ('OOps: Something Else',err)
+        except requests.exceptions.HTTPError as errh:
+            print ('Http Error:',errh)
+        except requests.exceptions.ConnectionError as errc:
+            print ('Error Connecting:',errc)
+        except requests.exceptions.Timeout as errt:
+            print ('Timeout Error:',errt)
+        print('sleep 1 min')
+        time.sleep(60)
+     
 if __name__ == '__main__':
     import argparse
     import os
     parser = argparse.ArgumentParser(description='ban specific clients for qbitorrent')
-    parser.add_argument('-c','--conf', help='conf file path')
-    args = parser.parse_args()
-    conf_path = vars(args).get('conf')
+    parser.add_argument('-a','--address', default='localhost', help='qbitorrent-webui portal address')
+    parser.add_argument('-p','--port', default='8080', help='qbitorrent-webui portal port')
+    parser.add_argument('--username', default='admin', help='webui auth username')
+    parser.add_argument('--password', help='webui auth passport')
+    parser.add_argument('-c','--conf', default='bx.conf', help='conf file path')
+    args = vars(parser.parse_args())
+    conf = {}
+    conf_path = args.pop('conf')
     if (conf_path is not None) and os.access(conf_path, os.F_OK):
-        start(conf_path)
-    elif os.access('bx.conf',os.F_OK):
-        start('bx.conf')
+        loadConfFromFile(conf_path)
     else:
-        print('not found conf file')
-
-
+        print('conf file not found', file=sys.stderr)
+        exit(1)
+    for arg in args:
+        conf[arg] = args[arg]
+    start(conf) 
