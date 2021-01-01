@@ -1,9 +1,9 @@
-address=127.0.0.1
+address=localhost
 port=8080
 username=admin
 password=admin
-ipdat_path=/home/example/ip.dat
-refresh_day=0
+ipdat-path=/home/example/ip.dat
+refresh-day=0
 block=Xunlei,1
 block=-XL0012,1
 block=Xfplay,1

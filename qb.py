@@ -8,17 +8,6 @@ import string
 import sys
 from datetime import date
 from requests import RequestException
-'''
-conf = {
-    'address':'127.0.0.1',
-    'port':8081,
-    'username':'admin',
-    'password':'',
-    'ipdat_path':'',
-    'block':[], #like [{'str':'','type':''}]
-    'refresh_day':'0'
-}
-'''
 
 ########## qbitorrent api ##########
 class QbAPI:
@@ -167,12 +156,12 @@ def blocking(conf):
         #refresh new block in file and apply
         if len(newblock_ips) > 0:
             blocked_ips.update(newblock_ips)
-            Ipdat.writeIpdatToFile(conf['ipdat_path'], newblock_ips)
+            Ipdat.writeIpdatToFile(conf['ipdat-path'], newblock_ips)
             print('apply and clean cache list')
             newblock_ips.clear()
         
         nowtime = date.today()
-        re_internal = int(conf['refresh_day'])
+        re_internal = int(conf['refresh-day'])
         if re_internal > 0 and (nowtime - lasttime).days > re_internal:
             with open(conf['ipdat_path'],mode='w+') as file_ips:
                 file_ips.write('')
@@ -183,7 +172,7 @@ def blocking(conf):
         time.sleep(10)
 
 def loadConfFromFile(conf_path):
-    valid_key = {'address','port','username','password','ipdat_path','block','refresh_day'}
+    valid_key = {'address','port','username','password','ipdat-path','block','refresh-day'}
     conf = {'block':[]}
     with open(conf_path,mode='r') as conf_file:
         for line in conf_file:
@@ -226,19 +215,31 @@ if __name__ == '__main__':
     import argparse
     import os
     parser = argparse.ArgumentParser(description='ban specific clients for qbitorrent')
-    parser.add_argument('-a','--address', default='localhost', help='qbitorrent-webui portal address')
-    parser.add_argument('-p','--port', default='8080', help='qbitorrent-webui portal port')
-    parser.add_argument('--username', default='admin', help='webui auth username')
-    parser.add_argument('--password', help='webui auth passport')
-    parser.add_argument('-c','--conf', default='bx.conf', help='conf file path')
+    parser.add_argument('-a','--address', help='WebUI authorization portal address')
+    parser.add_argument('-p','--port', help='WebUI authorization portal port')
+    parser.add_argument('--username', help='WebUI authorization username')
+    parser.add_argument('--password', help='WebUI authorization passport')
+    parser.add_argument('--ipdat-path', help='Ipdat file path')
+    parser.add_argument('--refresh-day', help='Internal(day) of refreshing ipdat file ')
+    parser.add_argument('-c','--conf', default='bx.conf', help='Conf file path')
     args = vars(parser.parse_args())
-    conf = {}
+    conf = {
+        'address': 'localhost',
+        'port': '8080',
+        'username': 'admin',
+        'passport': '',
+        'refresh-day': '0',
+        'ipdat-path': None
+    }
     conf_path = args.pop('conf')
     if (conf_path is not None) and os.access(conf_path, os.F_OK):
-        loadConfFromFile(conf_path)
+        conf.update(loadConfFromFile(conf_path))
     else:
         print('conf file not found', file=sys.stderr)
         exit(1)
     for arg in args:
+        if(args[arg] is None): 
+            continue
         conf[arg] = args[arg]
+    print('configure: ', conf)
     start(conf) 
