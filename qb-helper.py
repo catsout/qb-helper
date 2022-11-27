@@ -1,3 +1,5 @@
+#!/bin/python3
+
 import json
 import random
 import logging
@@ -265,6 +267,7 @@ async def qb_update(cfg: Config, qb_api: QbAPI, g: GlobalData):
             vars.peersinfo = await qb_api.get_torrent_peers(tor.infohash_v1, vars.peersinfo)
             for ip_port,peer in vars.peersinfo.peers.items():
                 if is_block_client(cfg, peer):
+                    logger.info(f'ban {peer.client}, {ip_port}')
                     newblock_ips.add(ip_port)
 
         if len(newblock_ips) > 0:
@@ -313,7 +316,7 @@ if __name__ == '__main__':
     parser.add_argument('--block', action='append', help='blocked client')
     parser.add_argument('--tls', action='store_true', help='enable tls')
     parser.add_argument('--fifo', help='fifo pipe path, needed for torrent completion')
-    parser.add_argument('--complete-exe', help='program to run when torrent complete, argurment is base64 of json')
+    parser.add_argument('--complete-exe', help='program to run when torrent complete, argument is base64 of json')
 
     args = vars(parser.parse_args())
     args = {k.replace('-', '_'):v for k,v in args.items() if v is not None}
